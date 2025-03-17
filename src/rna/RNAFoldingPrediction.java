@@ -29,18 +29,24 @@ public class RNAFoldingPrediction {
 
     public static void main(String[] args) {
         // Load RNA sequences from file
-        String filePath = "rna_sequences.txt";
+        String filePath = "rna_sequences.txt"; 
         Map<String, String> rnaSequences = loadRNASequences(filePath);
 
         // GUI
         JFrame frame = new JFrame("RNA Secondary Structure Prediction");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(400, 200); 
+        frame.setSize(500, 300);
         frame.setLayout(new BorderLayout());
 
         // Dropdown box at the top
         JComboBox<String> rnaComboBox = new JComboBox<>(rnaSequences.keySet().toArray(new String[0]));
         frame.add(rnaComboBox, BorderLayout.NORTH);
+
+        // Text area to display the RNA sequence and its length
+        JTextArea resultTextArea = new JTextArea();
+        resultTextArea.setEditable(false); 
+        resultTextArea.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        frame.add(new JScrollPane(resultTextArea), BorderLayout.CENTER);
 
         // Panel for buttons
         JPanel buttonPanel = new JPanel(new GridLayout(1, 2));
@@ -56,12 +62,22 @@ public class RNAFoldingPrediction {
             String selectedRNA = (String) rnaComboBox.getSelectedItem();
             if (selectedRNA != null) {
                 String rnaSequence = rnaSequences.get(selectedRNA);
-                exportButton.setEnabled(true); 
+                int sequenceLength = rnaSequence.length();
+
+                // Display the RNA sequence and its length in the text area
+                resultTextArea.setText(
+                        "Selected RNA: " + selectedRNA + "\n\n" +
+                        "RNA Sequence:\n" + rnaSequence + "\n\n" +
+                        "Sequence Length: " + sequenceLength + " nucleotides"
+                );
+
+                exportButton.setEnabled(true);
             }
         });
 
         // Action Listener for Export Button
         exportButton.addActionListener(e -> {
+            
         });
 
         // Show the frame
