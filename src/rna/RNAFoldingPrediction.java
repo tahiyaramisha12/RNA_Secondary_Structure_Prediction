@@ -2,9 +2,13 @@ package rna;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.Font;
 import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
+import java.awt.Desktop;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.*;
 
 public class RNAFoldingPrediction {
 
@@ -149,6 +153,80 @@ public class RNAFoldingPrediction {
         return analysis.toString();
     }
 
+    // Function to export results to Excel with color coding
+    private static void exportToExcel(String sequence, String foldingStructure, String analysis) {
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            XSSFSheet sheet = workbook.createSheet("RNA Folding Results");
+
+            // Create styles for paired and unpaired bases
+            XSSFCellStyle pairedStyle = workbook.createCellStyle();
+            pairedStyle.setFillForegroundColor(new XSSFColor(new byte[] { (byte) 144, (byte) 238, (byte) 144 }, null)); // Light green
+            pairedStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+            XSSFCellStyle unpairedStyle = workbook.createCellStyle();
+            unpairedStyle.setFillForegroundColor(new XSSFColor(new byte[] { (byte) 255, (byte) 182, (byte) 193 }, null)); // Light red
+            unpairedStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+            // Create a header row
+            XSSFRow headerRow = sheet.createRow(0);
+            XSSFCell headerCell = headerRow.createCell(0);
+            headerCell.setCellValue("RNA Sequence and Folding Structure");
+
+            // Create a row for the sequence
+            XSSFRow sequenceRow = sheet.createRow(1);
+            for (int i = 0; i < sequence.length(); i++) {
+                XSSFCell cell = sequenceRow.createCell(i);
+                cell.setCellValue(String.valueOf(sequence.charAt(i)));
+                if (foldingStructure.charAt(i) == '(' || foldingStructure.charAt(i) == ')') {
+                    cell.setCellStyle(pairedStyle);
+                } else {
+                    cell.setCellStyle(unpairedStyle);
+                }
+            }
+
+            // Create a row for the folding structure
+            XSSFRow foldingRow = sheet.createRow(2);
+            for (int i = 0; i < foldingStructure.length(); i++) {
+                XSSFCell cell = foldingRow.createCell(i);
+                cell.setCellValue(String.valueOf(foldingStructure.charAt(i)));
+                if (foldingStructure.charAt(i) == '(' || foldingStructure.charAt(i) == ')') {
+                    cell.setCellStyle(pairedStyle);
+                } else {
+                    cell.setCellStyle(unpairedStyle);
+                }
+            }
+
+            // Create a row for the analysis
+            XSSFRow analysisRow = sheet.createRow(4);
+            XSSFCell analysisCell = analysisRow.createCell(0);
+            analysisCell.setCellValue(analysis);
+
+            // Auto-size columns
+            for (int i = 0; i < sequence.length(); i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            // Open file chooser dialog to select export location
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setDialogTitle("Select Export Location");
+            fileChooser.setSelectedFile(new File("RNA_Folding_Results.xlsx"));
+            int userChoice = fileChooser.showSaveDialog(null);
+            if (userChoice == JFileChooser.APPROVE_OPTION) {
+                File outputFile = fileChooser.getSelectedFile();
+
+                // Write the output to the selected file
+                try (FileOutputStream fileOut = new FileOutputStream(outputFile)) {
+                    workbook.write(fileOut);
+                }
+
+                JOptionPane.showMessageDialog(null, "Results exported to " + outputFile.getAbsolutePath(), "Export Successful", JOptionPane.INFORMATION_MESSAGE);
+            }
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(null, "Error exporting to Excel: " + e.getMessage(),
+                    "Export Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
     public static void main(String[] args) {
         // Load RNA sequences from file
         String filePath = "rna_sequences.txt";
@@ -168,18 +246,22 @@ public class RNAFoldingPrediction {
         JTextArea resultTextArea = new JTextArea();
         resultTextArea.setEditable(false);
         resultTextArea.setFont(new Font("Monospaced", Font.PLAIN, 14));
+
         frame.add(new JScrollPane(resultTextArea), BorderLayout.CENTER);
 
         // Panel for buttons
-        JPanel buttonPanel = new JPanel(new GridLayout(1, 2));  // Two buttons in a row
+        JPanel buttonPanel = new JPanel(new GridLayout(1, 2));
         JButton predictButton = new JButton("Predict");
         JButton exportButton = new JButton("Export to Excel");
-        exportButton.setEnabled(false); // Disabled initially (no functionality yet)
+        exportButton.setEnabled(false); // Disabled initially
         buttonPanel.add(predictButton);
         buttonPanel.add(exportButton);
         frame.add(buttonPanel, BorderLayout.SOUTH);
 
-        // Action Listener for Button
+        // Variables to store prediction results
+        String[] currentPrediction = new String[3]; // sequence, foldingStructure, analysis
+
+        // Action Listener for Predict Button
         predictButton.addActionListener(e -> {
             String selectedRNA = (String) rnaComboBox.getSelectedItem();
             if (selectedRNA != null) {
@@ -188,16 +270,32 @@ public class RNAFoldingPrediction {
                 String foldingStructure = nussinov(rnaSequence);
                 String analysis = analyzeStructure(foldingStructure);
 
+                // Store results for export
+                currentPrediction[0] = rnaSequence;
+                currentPrediction[1] = foldingStructure;
+                currentPrediction[2] = analysis;
+
+                // Update UI
                 resultTextArea.setText(
                         "Selected RNA: " + selectedRNA + "\n\n" +
                         "RNA Sequence:\n" + rnaSequence + "\n\n" +
                         "Predicted Folding Structure:\n" + foldingStructure + "\n\n" +
                         "Length: " + sequenceLength + " nucleotides\n\n" +
-                        "Structure Analysis:\n" + analysis
-                );
+                        "Analysis:\n" + analysis);
+
+                exportButton.setEnabled(true); // Enable the Export button
             }
         });
 
+        // Action Listener for Export Button
+        exportButton.addActionListener(e -> {
+            String sequence = currentPrediction[0];
+            String foldingStructure = currentPrediction[1];
+            String analysis = currentPrediction[2];
+            exportToExcel(sequence, foldingStructure, analysis);
+        });
+
+        // Show the frame
         frame.setVisible(true);
     }
 }
