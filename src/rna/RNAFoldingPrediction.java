@@ -106,6 +106,49 @@ public class RNAFoldingPrediction {
         }
     }
 
+    // Function to analyze the predicted structure and provide suggestions
+    private static String analyzeStructure(String foldingStructure) {
+        int pairedRegions = 0;
+        int unpairedRegions = 0;
+        int maxUnpairedLength = 0;
+        int currentUnpairedLength = 0;
+
+        // Count paired and unpaired regions
+        for (char c : foldingStructure.toCharArray()) {
+            if (c == '(' || c == ')') {
+                pairedRegions++;
+                if (currentUnpairedLength > maxUnpairedLength) {
+                    maxUnpairedLength = currentUnpairedLength;
+                }
+                currentUnpairedLength = 0;
+            } else if (c == '.') {
+                unpairedRegions++;
+                currentUnpairedLength++;
+            }
+        }
+
+        // Check for long unpaired regions
+        if (currentUnpairedLength > maxUnpairedLength) {
+            maxUnpairedLength = currentUnpairedLength;
+        }
+
+        // Generate analysis comments
+        StringBuilder analysis = new StringBuilder();
+        if (pairedRegions > unpairedRegions) {
+            analysis.append("1. This RNA has a stable structure with strong pairing. It is likely functional for binding or catalysis.\n");
+        } else {
+            analysis.append("2. The structure contains long unpaired regions, which may affect stability. Further validation is needed.\n");
+        }
+
+        // Add additional details
+        analysis.append("\nAnalysis Details:\n");
+        analysis.append("- Total paired bases: ").append(pairedRegions).append("\n");
+        analysis.append("- Total unpaired bases: ").append(unpairedRegions).append("\n");
+        analysis.append("- Longest unpaired region: ").append(maxUnpairedLength).append(" bases\n");
+
+        return analysis.toString();
+    }
+
     public static void main(String[] args) {
         // Load RNA sequences from file
         String filePath = "rna_sequences.txt";
@@ -128,7 +171,7 @@ public class RNAFoldingPrediction {
         frame.add(new JScrollPane(resultTextArea), BorderLayout.CENTER);
 
         // Panel for buttons
-        JPanel buttonPanel = new JPanel(new GridLayout(1, 2));
+        JPanel buttonPanel = new JPanel(new GridLayout(1, 2));  // Two buttons in a row
         JButton predictButton = new JButton("Predict");
         JButton exportButton = new JButton("Export to Excel");
         exportButton.setEnabled(false); // Disabled initially (no functionality yet)
@@ -136,34 +179,25 @@ public class RNAFoldingPrediction {
         buttonPanel.add(exportButton);
         frame.add(buttonPanel, BorderLayout.SOUTH);
 
-        // Variables to store prediction results
-        String[] currentPrediction = new String[2]; // sequence, foldingStructure
-
-        // Action Listener for Predict Button
+        // Action Listener for Button
         predictButton.addActionListener(e -> {
             String selectedRNA = (String) rnaComboBox.getSelectedItem();
             if (selectedRNA != null) {
                 String rnaSequence = rnaSequences.get(selectedRNA);
                 int sequenceLength = rnaSequence.length();
                 String foldingStructure = nussinov(rnaSequence);
+                String analysis = analyzeStructure(foldingStructure);
 
-                // Store results for potential export
-                currentPrediction[0] = rnaSequence;
-                currentPrediction[1] = foldingStructure;
-
-                // Update UI
                 resultTextArea.setText(
                         "Selected RNA: " + selectedRNA + "\n\n" +
                         "RNA Sequence:\n" + rnaSequence + "\n\n" +
                         "Predicted Folding Structure:\n" + foldingStructure + "\n\n" +
-                        "Length: " + sequenceLength + " nucleotides"
+                        "Length: " + sequenceLength + " nucleotides\n\n" +
+                        "Structure Analysis:\n" + analysis
                 );
-
-                exportButton.setEnabled(true); // Enable the Export button after prediction
             }
         });
 
-        // Show the frame
         frame.setVisible(true);
     }
 }
