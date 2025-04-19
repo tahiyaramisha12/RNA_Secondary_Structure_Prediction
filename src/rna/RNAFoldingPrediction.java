@@ -34,80 +34,105 @@ public class RNAFoldingPrediction {
     public static String nussinov(String sequence) {
         int n = sequence.length();
         int[][] dp = new int[n][n];
-
-        // Initialize the DP table
+        
+        // Initialize with -INF for invalid regions
         for (int i = 0; i < n; i++) {
-            dp[i][i] = 0; // No base pairing for single nucleotides
-            if (i < n - 1) {
-                dp[i][i + 1] = 0; // No base pairing for sequences of length 1 or adjacent nucleotides
+            for (int j = 0; j < n; j++) {
+                dp[i][j] = Integer.MIN_VALUE;
             }
         }
-
-        // Fill the DP table
+        
+        // Base cases: empty regions and single nucleotides
+        for (int i = 0; i < n; i++) {
+            dp[i][i] = 0;  // Single nucleotide cannot form pairs
+            if (i < n - 1) {
+                dp[i][i + 1] = 0;  // Two adjacent nucleotides cannot form pairs in standard RNA folding
+            }
+        }
+        
+        // Fill the DP table (bottom-up)
         for (int length = 2; length < n; length++) {
             for (int i = 0; i < n - length; i++) {
                 int j = i + length;
-
-                //1: No pairing at j
-                dp[i][j] = dp[i][j - 1];
-
-                //2: Try pairing i and j
+                
+                // Case 1: i is unpaired
+                dp[i][j] = dp[i + 1][j];
+                
+                // Case 2: j is unpaired
+                dp[i][j] = Math.max(dp[i][j], dp[i][j - 1]);
+                
+                // Case 3: i pairs with j
                 if (isBasePair(sequence.charAt(i), sequence.charAt(j))) {
                     dp[i][j] = Math.max(dp[i][j], dp[i + 1][j - 1] + 1);
                 }
-
-                //3: Try splitting the sequence into two parts
-                for (int k = i; k < j; k++) {
-                    dp[i][j] = Math.max(dp[i][j], dp[i][k] + dp[k + 1][j]);
+                
+                // Case 4: i pairs with some k between i+1 and j-1
+                for (int k = i+1; k < j; k++) {
+                    if (isBasePair(sequence.charAt(i), sequence.charAt(k))) {
+                        dp[i][j] = Math.max(dp[i][j], dp[i+1][k-1] + dp[k + 1][j]+1);
+                    }
                 }
             }
         }
-
-        //to form the folding structure
-        char[] foldingStructure = new char[n];
+        
+        // Construct the folding structure
+        char[] structure = new char[n];
         for (int i = 0; i < n; i++) {
-            foldingStructure[i] = '.';
+            structure[i] = '.';
         }
-
-        //performTraceback to reconstruct the structure
-        performTraceback(sequence, 0, n - 1, dp, foldingStructure);
-
-        return new String(foldingStructure);
+        
+        // Traceback to identify the paired bases
+        traceback(sequence, 0, n - 1, dp, structure);
+        
+        return new String(structure);
     }
 
     //check if two bases form a valid pair
     private static boolean isBasePair(char base1, char base2) {
-        return (base1 == 'A' && base2 == 'U') || (base1 == 'U' && base2 == 'A') ||
-               (base1 == 'G' && base2 == 'C') || (base1 == 'C' && base2 == 'G');
+        return (base1 == 'A' && base2 == 'U') || 
+               (base1 == 'U' && base2 == 'A') ||
+               (base1 == 'G' && base2 == 'C') || 
+               (base1 == 'C' && base2 == 'G') ||
+               (base1 == 'G' && base2 == 'U') || 
+               (base1 == 'U' && base2 == 'G');
     }
 
     //Backtracking to reconstruct the base pairing
-    private static void performTraceback(String sequence, int i, int j, int[][] dp, char[] foldingStructure) {
+    private static void traceback(String sequence, int i, int j, int[][] dp, char[] structure) {
         if (i >= j) {
-            return; //to stop the recursion when i crosses or meets j
+            return;
         }
-
+        
+        // Case 1: i is unpaired
         if (dp[i][j] == dp[i + 1][j]) {
-            // No pairing at i move to i+1
-            performTraceback(sequence, i + 1, j, dp, foldingStructure);
-        } else if (dp[i][j] == dp[i][j - 1]) {
-            // No pairing at j move to j-1
-            performTraceback(sequence, i, j - 1, dp, foldingStructure);
-        } else if (isBasePair(sequence.charAt(i), sequence.charAt(j)) && dp[i][j] == dp[i + 1][j - 1] + 1) {
-            // Pairing between i and j
-            foldingStructure[i] = '(';
-            foldingStructure[j] = ')';
-            performTraceback(sequence, i + 1, j - 1, dp, foldingStructure);
-        } else {
-            // Split the sequence into two parts
-        	//No direct pairing between i and j
-        	//optimal solution is a combination of two subproblems
-            for (int k = i + 1; k < j; k++) {
-                if (dp[i][j] == dp[i][k] + dp[k + 1][j]) {
-                    performTraceback(sequence, i, k, dp, foldingStructure);
-                    performTraceback(sequence, k + 1, j, dp, foldingStructure);
-                    return;
-                }
+            traceback(sequence, i + 1, j, dp, structure);
+            return;
+        }
+        
+        // Case 2: j is unpaired
+        if (dp[i][j] == dp[i][j - 1]) {
+            traceback(sequence, i, j - 1, dp, structure);
+            return;
+        }
+        
+        // Case 3: i pairs with j
+        if (isBasePair(sequence.charAt(i), sequence.charAt(j)) && 
+            dp[i][j] == dp[i + 1][j - 1] + 1) {
+            structure[i] = '(';
+            structure[j] = ')';
+            traceback(sequence, i + 1, j - 1, dp, structure);
+            return;
+        }
+        
+        // Case 4: i pairs with some k between i+1 and j-1
+        for (int k = i+1; k < j; k++) {
+            if (isBasePair(sequence.charAt(i), sequence.charAt(k)) && 
+                dp[i][j] == dp[i+1][k-1] + dp[k + 1][j]+1) {
+                structure[i] = '(';
+                structure[k] = ')';
+                traceback(sequence, i+1, k-1, dp, structure);
+                traceback(sequence, k + 1, j, dp, structure);
+                return;
             }
         }
     }
